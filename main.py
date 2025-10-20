@@ -124,6 +124,77 @@ def get_mailing_users():
     return users
 
 
+def read_text_file(file_path):
+    try:
+        if not os.path.exists(file_path):
+            return "Информация пока не добавлена"
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read().strip()
+            return content if content else "Информация пока не добавлена"
+    except Exception:
+        return "Ошибка при чтении информации"
+
+
+def read_schedule_file(group_number, week_type, day_en):
+    try:
+        if "3" in group_number:
+            group_folder = "group 3"
+        elif "4" in group_number:
+            group_folder = "group 4"
+        else:
+            group_folder = "group 3"
+        file_path = os.path.join('storage/schedule', group_folder, week_type, f"{day_en}.txt")
+        if not os.path.exists(file_path):
+            return None
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read().strip()
+            return content if content else None
+    except Exception:
+        return None
+
+
+def get_current_week():
+    week_number = datetime.now().isocalendar()[1]
+    return "lower" if week_number % 2 == 0 else "upper"
+
+
+def is_valid_time(time_str):
+    pattern = r'^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$'
+    return re.match(pattern, time_str) is not None
+
+
+def get_profile_text(user_data):
+    profile_template = read_text_file('storage/data/profile.txt')
+    return profile_template.format(
+        last_name=user_data[1],
+        first_name=user_data[2],
+        group=user_data[3],
+        email=user_data[4]
+    )
+
+
+def get_mailing_status_text(user_data):
+    mailing_enabled = user_data[5] if len(user_data) > 5 else False
+    mailing_time = user_data[6] if len(user_data) > 6 else "07:00"
+    mailing_status = "✅ Включена" if mailing_enabled else "❌ Выключена"
+    status_text = f"📧 Текущие настройки рассылки:\n\nСостояние: {mailing_status}\nВремя рассылки: {mailing_time}\n\nВыберите действие:"
+    return status_text
+
+
+def read_curators_file(group_number):
+    try:
+        if group_number == "3":
+            filename = "group 3.txt"
+        elif group_number == "4":
+            filename = "group 4.txt"
+        else:
+            return None
+        file_path = os.path.join('storage', 'contacts', 'curators', filename)
+        return read_text_file(file_path)
+    except Exception:
+        return "Информация о кураторах не найдена"
+
+
 async def main():
     create_database()
     await dp.start_polling(bot)
