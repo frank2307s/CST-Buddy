@@ -22,6 +22,22 @@ router = Router()
 dp.include_router(router)
 
 
+class RegistrationStates(StatesGroup):
+    waiting_for_name = State()
+    waiting_for_group = State()
+    waiting_for_email = State()
+
+
+class EditProfileStates(StatesGroup):
+    waiting_for_new_name = State()
+    waiting_for_new_group = State()
+    waiting_for_new_email = State()
+
+
+class MailingTimeStates(StatesGroup):
+    waiting_for_time = State()
+
+
 def create_database():
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
