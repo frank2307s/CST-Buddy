@@ -513,6 +513,199 @@ async def send_daily_schedule():
             await asyncio.sleep(60)
 
 
+@router.message(Command("start"))
+async def cmd_start(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    if is_user_registered(user_id):
+        await message.answer("Добро пожаловать! Выберите опцию:", reply_markup=get_main_keyboard())
+    else:
+        await state.set_state(RegistrationStates.waiting_for_name)
+        await message.answer("Добро пожаловать! Для регистрации введите вашу Фамилию и Имя через пробел:")
+
+
+@router.message(F.text == "Мой профиль")
+async def my_profile(message: Message):
+    user_data = get_user_data(message.from_user.id)
+    if user_data:
+        profile_text = get_profile_text(user_data)
+        await message.answer(profile_text, reply_markup=get_profile_inline_keyboard(user_data))
+    else:
+        await message.answer("Профиль не найден.", reply_markup=get_main_keyboard())
+
+
+@router.message(RegistrationStates.waiting_for_name)
+async def process_name(message: Message, state: FSMContext):
+    name_parts = message.text.split()
+    if len(name_parts) < 2:
+        await message.answer("Пожалуйста, введите Фамилию и Имя через пробел:")
+        return
+    await state.update_data(last_name=name_parts[0], first_name=' '.join(name_parts[1:]))
+    await state.set_state(RegistrationStates.waiting_for_group)
+    await message.answer("Выберите вашу группу:", reply_markup=get_group_selection_registration_keyboard())
+
+
+@router.callback_query(F.data.endswith("_reg"), RegistrationStates.waiting_for_group)
+async def process_group_callback(callback: types.CallbackQuery, state: FSMContext):
+    group_mapping = {
+        "group_3_reg": "3 группа",
+        "group_4_reg": "4 группа",
+        "group_guest_reg": "Гость"
+    }
+    group = group_mapping.get(callback.data)
+    if not group:
+        await callback.message.answer("Пожалуйста, выберите группу из предложенных вариантов:")
+        return
+    await state.update_data(group=group)
+    if group == "Гость":
+        data = await state.get_data()
+        register_user(
+            user_id=callback.from_user.id,
+            last_name=data['last_name'],
+            first_name=data['first_name'],
+            group_number=data['group'],
+            email="Не указан"
+        )
+        await callback.message.answer("Регистрация завершена! Теперь вы можете пользоваться ботом.",
+                                      reply_markup=get_main_keyboard())
+        await state.clear()
+    else:
+        await state.set_state(RegistrationStates.waiting_for_email)
+        await callback.message.answer("Введите вашу корпоративную почту:")
+    await callback.answer()
+
+
+@router.message(RegistrationStates.waiting_for_email)
+async def process_email(message: Message, state: FSMContext):
+    email = message.text
+    if '@' not in email or '.' not in email:
+        await message.answer("Пожалуйста, введите корректный email:")
+        return
+    data = await state.get_data()
+    register_user(
+        user_id=message.from_user.id,
+        last_name=data['last_name'],
+        first_name=data['first_name'],
+        group_number=data['group'],
+        email=email
+    )
+    await message.answer("Регистрация завершена! Теперь вы можете пользоваться ботом.",
+                         reply_markup=get_main_keyboard())
+    await state.clear()
+
+
+@router.callback_query(F.data == "edit_name")
+async def edit_name_callback(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(EditProfileStates.waiting_for_new_name)
+    await callback.message.answer("Введите новую Фамилию и Имя через пробел:")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "edit_group")
+async def edit_group_callback(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(EditProfileStates.waiting_for_new_group)
+    await callback.message.answer("Выберите новую группу:", reply_markup=get_group_selection_registration_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "edit_email")
+async def edit_email_callback(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(EditProfileStates.waiting_for_new_email)
+    await callback.message.answer("Введите новый email:")
+    await callback.answer()
+
+
+@router.message(EditProfileStates.waiting_for_new_name)
+async def process_new_name(message: Message, state: FSMContext):
+    name_parts = message.text.split()
+    if len(name_parts) < 2:
+        await message.answer("Пожалуйста, введите Фамилию и Имя через пробел:")
+        return
+    user_data = get_user_data(message.from_user.id)
+    update_user_data(
+        user_id=message.from_user.id,
+        last_name=name_parts[0],
+        first_name=' '.join(name_parts[1:]),
+        group_number=user_data[3],
+        email=user_data[4]
+    )
+    await message.answer("✅ Имя успешно изменено!")
+    await state.clear()
+
+
+@router.callback_query(F.data.endswith("_reg"), EditProfileStates.waiting_for_new_group)
+async def process_new_group_callback(callback: types.CallbackQuery, state: FSMContext):
+    group_mapping = {
+        "group_3_reg": "3 группа",
+        "group_4_reg": "4 группа",
+        "group_guest_reg": "Гость"
+    }
+    group = group_mapping.get(callback.data)
+    if not group:
+        await callback.message.answer("Пожалуйста, выберите группу из предложенных вариантов:")
+        return
+    user_data = get_user_data(callback.from_user.id)
+    if group == "Гость" and user_data[3] != "Гость":
+        disable_mailing(callback.from_user.id)
+        update_user_data(
+            user_id=callback.from_user.id,
+            last_name=user_data[1],
+            first_name=user_data[2],
+            group_number=group,
+            email="Не указан"
+        )
+        await callback.message.answer("✅ Группа успешно изменена! Рассылка автоматически выключена.")
+        await state.clear()
+    elif group != "Гость" and user_data[3] == "Гость":
+        await state.update_data(new_group=group)
+        await state.set_state(EditProfileStates.waiting_for_new_email)
+        await callback.message.answer("Введите вашу корпоративную почту:")
+    elif group != "Гость" and user_data[3] != "Гость":
+        update_user_data(
+            user_id=callback.from_user.id,
+            last_name=user_data[1],
+            first_name=user_data[2],
+            group_number=group,
+            email=user_data[4]
+        )
+        await callback.message.answer("✅ Группа успешно изменена!")
+        await state.clear()
+    else:
+        update_user_data(
+            user_id=callback.from_user.id,
+            last_name=user_data[1],
+            first_name=user_data[2],
+            group_number=group,
+            email=user_data[4]
+        )
+        await callback.message.answer("✅ Группа успешно изменена!")
+        await state.clear()
+    await callback.answer()
+
+
+@router.message(EditProfileStates.waiting_for_new_email)
+async def process_new_email(message: Message, state: FSMContext):
+    email = message.text
+    if '@' not in email or '.' not in email:
+        await message.answer("Пожалуйста, введите корректный email:")
+        return
+    user_data = get_user_data(message.from_user.id)
+    data = await state.get_data()
+    new_group = data.get('new_group')
+    if new_group:
+        update_user_data(
+            user_id=message.from_user.id,
+            last_name=user_data[1],
+            first_name=user_data[2],
+            group_number=new_group,
+            email=email
+        )
+        await message.answer("✅ Данные профиля успешно обновлены!")
+        await state.clear()
+    else:
+        await message.answer("Ошибка при обновлении данных. Попробуйте еще раз.")
+        await state.clear()
+
+
 async def main():
     create_database()
     asyncio.create_task(send_daily_schedule())
