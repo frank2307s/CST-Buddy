@@ -442,8 +442,80 @@ def get_subject_teacher_keyboard(subject):
     return teacher_keyboards.get(subject)
 
 
+async def send_schedule(callback, group_display, group_number, week_type, schedule_type):
+    try:
+        week_display = "верхняя" if week_type == "upper" else "нижняя"
+        if schedule_type == "today":
+            day_of_week = datetime.now().weekday()
+            if day_of_week > 4:
+                await callback.message.answer("Сегодня выходной! Расписания нет.")
+                return
+            days_en = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+            days_ru = ['понедельник', 'вторник', 'среду', 'четверг', 'пятницу']
+            day_name = days_en[day_of_week]
+            day_name_ru = days_ru[day_of_week]
+            schedule_text = read_schedule_file(group_number, week_type, day_name)
+            if schedule_text:
+                message = f"📅 Расписание на {day_name_ru}\n👥 {group_display}, {week_display} неделя\n\n{schedule_text}"
+                await callback.message.answer(message)
+            else:
+                await callback.message.answer(f"На {day_name_ru} ({week_display} неделя) расписания нет.")
+        else:
+            week_schedule = f"📅 Расписание на неделю\n👥 {group_display}, {week_display} неделя\n\n"
+            days = [
+                ('monday', 'Понедельник'),
+                ('tuesday', 'Вторник'),
+                ('wednesday', 'Среда'),
+                ('thursday', 'Четверг'),
+                ('friday', 'Пятница')
+            ]
+            has_content = False
+            for day_en, day_ru in days:
+                day_schedule = read_schedule_file(group_number, week_type, day_en)
+                if day_schedule:
+                    week_schedule += f"📌{day_ru}:\n\n{day_schedule}\n\n\n"
+                    has_content = True
+            if has_content:
+                await callback.message.answer(week_schedule)
+            else:
+                await callback.message.answer(f"Расписание на {week_display} неделю не найдено.")
+    except Exception:
+        await callback.message.answer("Произошла ошибка при загрузке расписания. Попробуйте позже.")
+
+
+async def send_daily_schedule():
+    while True:
+        try:
+            now = datetime.now()
+            users = get_mailing_users()
+            current_week = get_current_week()
+            for user_id, mailing_time_str, group_number in users:
+                try:
+                    mailing_time = datetime.strptime(mailing_time_str, '%H:%M').time()
+                    current_time = now.time()
+                    if current_time.hour == mailing_time.hour and current_time.minute == mailing_time.minute:
+                        day_of_week = datetime.now().weekday()
+                        if day_of_week > 4:
+                            continue
+                        days_en = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+                        days_ru = ['понедельник', 'вторник', 'среду', 'четверг', 'пятницу']
+                        day_name = days_en[day_of_week]
+                        day_name_ru = days_ru[day_of_week]
+                        schedule_text = read_schedule_file(group_number, current_week, day_name)
+                        if schedule_text:
+                            week_display = "верхняя" if current_week == "upper" else "нижняя"
+                            message = f"📅 Расписание на {day_name_ru}\n👥 {group_number}, {week_display} неделя\n\n{schedule_text}"
+                            await bot.send_message(user_id, message)
+                except Exception:
+                    continue
+            await asyncio.sleep(60)
+        except Exception:
+            await asyncio.sleep(60)
+
+
 async def main():
     create_database()
+    asyncio.create_task(send_daily_schedule())
     await dp.start_polling(bot)
 
 
