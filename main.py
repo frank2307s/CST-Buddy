@@ -706,6 +706,223 @@ async def process_new_email(message: Message, state: FSMContext):
         await state.clear()
 
 
+@router.message(F.text == "Расписание")
+async def schedule_menu(message: Message):
+    user_data = get_user_data(message.from_user.id)
+    if user_data:
+        await message.answer("📅 Меню расписания:\n\nВыберите опцию:",
+                             reply_markup=get_schedule_inline_keyboard(user_data))
+    else:
+        await message.answer("Профиль не найден.")
+
+
+@router.callback_query(F.data == "schedule_today")
+async def schedule_today_callback(callback: types.CallbackQuery):
+    user_data = get_user_data(callback.from_user.id)
+    if not user_data:
+        await callback.message.answer("Профиль не найден.")
+        return
+    if user_data[3] == "Гость":
+        await callback.message.answer(
+            "👥 Выберите группу для просмотра расписания на сегодня:",
+            reply_markup=get_group_selection_keyboard("today")
+        )
+    else:
+        await callback.message.answer(
+            "Выберите неделю для просмотра расписания на сегодня:",
+            reply_markup=get_week_selection_keyboard("today")
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "schedule_week")
+async def schedule_week_callback(callback: types.CallbackQuery):
+    user_data = get_user_data(callback.from_user.id)
+    if not user_data:
+        await callback.message.answer("Профиль не найден.")
+        return
+    if user_data[3] == "Гость":
+        await callback.message.answer(
+            "👥 Выберите группу для просмотра расписания на неделю:",
+            reply_markup=get_group_selection_keyboard("week")
+        )
+    else:
+        await callback.message.answer(
+            "Выберите неделю для просмотра расписания на неделю:",
+            reply_markup=get_week_selection_keyboard("week")
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "today_upper")
+async def handle_today_upper(callback: types.CallbackQuery):
+    user_data = get_user_data(callback.from_user.id)
+    if user_data:
+        await send_schedule(callback, user_data[3], user_data[3], "upper", "today")
+    else:
+        await callback.message.answer("Профиль не найден.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "today_lower")
+async def handle_today_lower(callback: types.CallbackQuery):
+    user_data = get_user_data(callback.from_user.id)
+    if user_data:
+        await send_schedule(callback, user_data[3], user_data[3], "lower", "today")
+    else:
+        await callback.message.answer("Профиль не найден.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "week_upper")
+async def handle_week_upper(callback: types.CallbackQuery):
+    user_data = get_user_data(callback.from_user.id)
+    if user_data:
+        await send_schedule(callback, user_data[3], user_data[3], "upper", "week")
+    else:
+        await callback.message.answer("Профиль не найден.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "week_lower")
+async def handle_week_lower(callback: types.CallbackQuery):
+    user_data = get_user_data(callback.from_user.id)
+    if user_data:
+        await send_schedule(callback, user_data[3], user_data[3], "lower", "week")
+    else:
+        await callback.message.answer("Профиль не найден.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "guest_today_3")
+async def handle_guest_today_3(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "👥 Группа: 3 группа\nВыберите неделю для просмотра расписания на сегодня:",
+        reply_markup=get_week_selection_keyboard("today", "3")
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "guest_today_4")
+async def handle_guest_today_4(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "👥 Группа: 4 группа\nВыберите неделю для просмотра расписания на сегодня:",
+        reply_markup=get_week_selection_keyboard("today", "4")
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "guest_week_3")
+async def handle_guest_week_3(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "👥 Группа: 3 группа\nВыберите неделю для просмотра расписания на неделю:",
+        reply_markup=get_week_selection_keyboard("week", "3")
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "guest_week_4")
+async def handle_guest_week_4(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "👥 Группа: 4 группа\nВыберите неделю для просмотра расписания на неделю:",
+        reply_markup=get_week_selection_keyboard("week", "4")
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("guest_today_") & (F.data.endswith("_upper") | F.data.endswith("_lower")))
+async def handle_guest_today_week(callback: types.CallbackQuery):
+    parts = callback.data.split("_")
+    group_number = parts[2]
+    week_type = parts[3]
+    group_display = f"{group_number} группа (гостевой доступ)"
+    await send_schedule(callback, group_display, f"{group_number} группа", week_type, "today")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("guest_week_") & (F.data.endswith("_upper") | F.data.endswith("_lower")))
+async def handle_guest_week_week(callback: types.CallbackQuery):
+    parts = callback.data.split("_")
+    group_number = parts[2]
+    week_type = parts[3]
+    group_display = f"{group_number} группа (гостевой доступ)"
+    await send_schedule(callback, group_display, f"{group_number} группа", week_type, "week")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_schedule")
+async def back_to_schedule_callback(callback: types.CallbackQuery):
+    user_data = get_user_data(callback.from_user.id)
+    if user_data:
+        await callback.message.answer("📅 Меню расписания:\n\nВыберите опцию:",
+                                      reply_markup=get_schedule_inline_keyboard(user_data))
+    else:
+        await callback.message.answer("Профиль не найден.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "mailing_settings")
+async def mailing_settings_callback(callback: types.CallbackQuery):
+    user_data = get_user_data(callback.from_user.id)
+    if user_data:
+        status_text = get_mailing_status_text(user_data)
+        await callback.message.answer(status_text, reply_markup=get_mailing_settings_keyboard(user_data))
+    else:
+        await callback.message.answer("Профиль не найден.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "enable_mailing")
+async def enable_mailing_callback(callback: types.CallbackQuery):
+    user_data = get_user_data(callback.from_user.id)
+    if user_data and user_data[3] == "Гость":
+        await callback.answer("Рассылка недоступна для гостей!", show_alert=True)
+        return
+    enable_mailing(callback.from_user.id)
+    user_data = get_user_data(callback.from_user.id)
+    status_text = get_mailing_status_text(user_data)
+    await callback.message.edit_text(status_text, reply_markup=get_mailing_settings_keyboard(user_data))
+    await callback.answer("Рассылка включена!")
+
+
+@router.callback_query(F.data == "disable_mailing")
+async def disable_mailing_callback(callback: types.CallbackQuery):
+    disable_mailing(callback.from_user.id)
+    user_data = get_user_data(callback.from_user.id)
+    status_text = get_mailing_status_text(user_data)
+    await callback.message.edit_text(status_text, reply_markup=get_mailing_settings_keyboard(user_data))
+    await callback.answer("Рассылка выключена!")
+
+
+@router.callback_query(F.data == "change_mailing_time")
+async def change_mailing_time_callback(callback: types.CallbackQuery, state: FSMContext):
+    user_data = get_user_data(callback.from_user.id)
+    if user_data and user_data[3] == "Гость":
+        await callback.answer("Рассылка недоступна для гостей!", show_alert=True)
+        return
+    await state.set_state(MailingTimeStates.waiting_for_time)
+    await callback.message.answer(
+        "Введите время для рассылки расписания в формате ЧЧ:MM (например, 08:30 или 14:00):\n\n"
+        "⚠️ Время должно быть в 24-часовом формате от 00:00 до 23:59"
+    )
+    await callback.answer()
+
+
+@router.message(MailingTimeStates.waiting_for_time)
+async def process_mailing_time(message: Message, state: FSMContext):
+    if is_valid_time(message.text):
+        update_mailing_time(message.from_user.id, message.text)
+        await message.answer("✅ Время рассылки изменено!")
+        await state.clear()
+    else:
+        await message.answer(
+            "❌ Неверный формат времени!\n\n"
+            "Пожалуйста, введите время в формате ЧЧ:MM (например, 08:30 или 14:00)\n"
+            "Время должно быть в диапазоне от 00:00 до 23:59\n\n"
+            "Попробуйте еще раз:"
+        )
+
+
 async def main():
     create_database()
     asyncio.create_task(send_daily_schedule())
