@@ -14,7 +14,7 @@ from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKe
 
 logging.basicConfig(level=logging.INFO)
 
-API_TOKEN = '8273165864:AAF1DG7kUiQXS6qwvxwU3klt8cSgjZpJsjI'
+API_TOKEN = '7997011708:AAEklALPWefzYXtub9ReyWQq0ms7P-rVhF8'
 
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
@@ -533,6 +533,33 @@ async def my_profile(message: Message):
         await message.answer("Профиль не найден.", reply_markup=get_main_keyboard())
 
 
+@router.message(F.text == "Основная информация")
+async def main_info(message: Message):
+    info_text = read_text_file('storage/data/information.txt')
+    await message.answer(info_text, reply_markup=get_addresses_keyboard())
+
+
+@router.message(F.text == "Контакты")
+async def contacts(message: Message):
+    await message.answer("📞 Выберите категорию контактов:", reply_markup=get_contacts_inline_keyboard())
+
+
+@router.message(F.text == "Дисциплины")
+async def subjects(message: Message):
+    await message.answer("📚 Список предметов:\n\nВыберите предмет из списка ниже:",
+                         reply_markup=get_subjects_inline_keyboard())
+
+
+@router.message(F.text == "Расписание")
+async def schedule_menu(message: Message):
+    user_data = get_user_data(message.from_user.id)
+    if user_data:
+        await message.answer("📅 Меню расписания:\n\nВыберите опцию:",
+                             reply_markup=get_schedule_inline_keyboard(user_data))
+    else:
+        await message.answer("Профиль не найден.")
+
+
 @router.message(RegistrationStates.waiting_for_name)
 async def process_name(message: Message, state: FSMContext):
     name_parts = message.text.split()
@@ -704,16 +731,6 @@ async def process_new_email(message: Message, state: FSMContext):
     else:
         await message.answer("Ошибка при обновлении данных. Попробуйте еще раз.")
         await state.clear()
-
-
-@router.message(F.text == "Расписание")
-async def schedule_menu(message: Message):
-    user_data = get_user_data(message.from_user.id)
-    if user_data:
-        await message.answer("📅 Меню расписания:\n\nВыберите опцию:",
-                             reply_markup=get_schedule_inline_keyboard(user_data))
-    else:
-        await message.answer("Профиль не найден.")
 
 
 @router.callback_query(F.data == "schedule_today")
@@ -923,23 +940,6 @@ async def process_mailing_time(message: Message, state: FSMContext):
         )
 
 
-@router.message(F.text == "Основная информация")
-async def main_info(message: Message):
-    info_text = read_text_file('storage/data/information.txt')
-    await message.answer(info_text, reply_markup=get_addresses_keyboard())
-
-
-@router.message(F.text == "Контакты")
-async def contacts(message: Message):
-    await message.answer("📞 Выберите категорию контактов:", reply_markup=get_contacts_inline_keyboard())
-
-
-@router.message(F.text == "Дисциплины")
-async def subjects(message: Message):
-    await message.answer("📚 Список предметов:\n\nВыберите предмет из списка ниже:",
-                         reply_markup=get_subjects_inline_keyboard())
-
-
 @router.callback_query(F.data.startswith("address_"))
 async def handle_address_callback(callback: types.CallbackQuery):
     address_files = {
@@ -979,9 +979,8 @@ async def groupmates_callback(callback: types.CallbackQuery):
 
 @router.callback_query(F.data == "teachers")
 async def teachers_callback(callback: types.CallbackQuery):
-    await callback.message.answer(
-        "👨‍🏫👩‍🏫 Ваши преподаватели на этот модуль:\n\nВыберите преподавателя из списка ниже:",
-        reply_markup=get_teachers_inline_keyboard())
+    await callback.message.answer("👨‍🏫👩‍🏫 Ваши преподаватели на этот модуль:\n\nВыберите преподавателя из списка ниже:",
+                                  reply_markup=get_teachers_inline_keyboard())
     await callback.answer()
 
 
