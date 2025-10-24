@@ -923,6 +923,181 @@ async def process_mailing_time(message: Message, state: FSMContext):
         )
 
 
+@router.message(F.text == "Основная информация")
+async def main_info(message: Message):
+    info_text = read_text_file('storage/data/information.txt')
+    await message.answer(info_text, reply_markup=get_addresses_keyboard())
+
+
+@router.message(F.text == "Контакты")
+async def contacts(message: Message):
+    await message.answer("📞 Выберите категорию контактов:", reply_markup=get_contacts_inline_keyboard())
+
+
+@router.message(F.text == "Дисциплины")
+async def subjects(message: Message):
+    await message.answer("📚 Список предметов:\n\nВыберите предмет из списка ниже:",
+                         reply_markup=get_subjects_inline_keyboard())
+
+
+@router.callback_query(F.data.startswith("address_"))
+async def handle_address_callback(callback: types.CallbackQuery):
+    address_files = {
+        "address_1": "storage/addresses/B. Pecherskaya, 25_12.txt",
+        "address_2": "storage/addresses/Kostina, 2b.txt",
+        "address_3": "storage/addresses/Lvovskaya, 1B.txt",
+        "address_4": "storage/addresses/Rodionova, 136.txt",
+        "address_5": "storage/addresses/Sormovskoe sh., 30.txt"
+    }
+    address_coordinates = {
+        "address_1": {"latitude": 56.324875, "longitude": 44.022147},
+        "address_2": {"latitude": 56.312615, "longitude": 43.992036},
+        "address_3": {"latitude": 56.268496, "longitude": 43.877788},
+        "address_4": {"latitude": 56.317467, "longitude": 44.067314},
+        "address_5": {"latitude": 56.335001, "longitude": 43.888109}
+    }
+    address_file = address_files.get(callback.data)
+    coordinates = address_coordinates.get(callback.data)
+    if address_file and coordinates:
+        address_info = read_text_file(address_file)
+        await callback.message.answer_location(
+            latitude=coordinates["latitude"],
+            longitude=coordinates["longitude"]
+        )
+        await callback.message.answer(address_info)
+    else:
+        await callback.message.answer("Адрес не найден")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "groupmates")
+async def groupmates_callback(callback: types.CallbackQuery):
+    await callback.message.answer("👥 Выберите группу для просмотра одногруппников:",
+                                  reply_markup=get_groupmates_inline_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "teachers")
+async def teachers_callback(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "👨‍🏫👩‍🏫 Ваши преподаватели на этот модуль:\n\nВыберите преподавателя из списка ниже:",
+        reply_markup=get_teachers_inline_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "curators")
+async def curators_callback(callback: types.CallbackQuery):
+    await callback.message.answer("🌟 Информация о кураторах групп:\n\nВыберите группу:",
+                                  reply_markup=get_curators_groups_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_contacts")
+async def back_to_contacts_callback(callback: types.CallbackQuery):
+    await callback.message.answer("📞 Выберите категорию контактов:", reply_markup=get_contacts_inline_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "curators_group_3")
+async def curators_group_3_callback(callback: types.CallbackQuery):
+    curators_info = read_curators_file("3")
+    await callback.message.answer(curators_info)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "curators_group_4")
+async def curators_group_4_callback(callback: types.CallbackQuery):
+    curators_info = read_curators_file("4")
+    await callback.message.answer(curators_info)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "group_3")
+async def group_3_callback(callback: types.CallbackQuery):
+    users = get_group_users("3 группа")
+    if users:
+        contacts_text = "👥 Список одногруппников (3 группа):\n\n"
+        for last_name, first_name, user_id, email in users:
+            contacts_text += f"• {last_name} {first_name}\n📧 {email}\n\n"
+        await callback.message.answer(contacts_text)
+    else:
+        await callback.message.answer("В 3 группе пока нет зарегистрированных пользователей.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "group_4")
+async def group_4_callback(callback: types.CallbackQuery):
+    users = get_group_users("4 группа")
+    if users:
+        contacts_text = "👥 Список одногруппников (4 группа):\n\n"
+        for last_name, first_name, user_id, email in users:
+            contacts_text += f"• {last_name} {first_name}\n📧 {email}\n\n"
+        await callback.message.answer(contacts_text)
+    else:
+        await callback.message.answer("В 4 группе пока нет зарегистрированных пользователей.")
+    await callback.answer()
+
+
+@router.callback_query(F.data.in_([
+    "english", "safe", "discrete", "history", "linear",
+    "calculus", "digital", "statehood", "cpp", "software", "pe"
+]))
+async def handle_subject_callback(callback: types.CallbackQuery):
+    subject_files = {
+        "english": "storage/disciplines/English.txt",
+        "safe": "storage/disciplines/Safe Living Basics.txt",
+        "discrete": "storage/disciplines/Discrete Mathematics.txt",
+        "history": "storage/disciplines/Russian History.txt",
+        "linear": "storage/disciplines/Linear Algebra and Geometry.txt",
+        "calculus": "storage/disciplines/Calculus.txt",
+        "digital": "storage/disciplines/Scientific Practical Seminar Digital Literacy.txt",
+        "statehood": "storage/disciplines/Foundations of Russian Statehood.txt",
+        "cpp": "storage/disciplines/C C++ Programming.txt",
+        "software": "storage/disciplines/Software Engineering.txt",
+        "pe": "storage/disciplines/Physical Training.txt"
+    }
+    subject_file = subject_files.get(callback.data)
+    if subject_file:
+        subject_info = read_text_file(subject_file)
+        teacher_keyboard = get_subject_teacher_keyboard(callback.data)
+        await callback.message.answer(subject_info, reply_markup=teacher_keyboard)
+    else:
+        await callback.message.answer("Информация по предмету не найдена")
+    await callback.answer()
+
+
+@router.callback_query(F.data.in_([
+    "gorodnova", "konstantinova", "kocherov", "marevichev",
+    "peplin", "poloneckaya", "savina", "taleckiy", "ulitin", "chistyakova"
+]))
+async def handle_teacher_callback(callback: types.CallbackQuery):
+    teacher_files = {
+        "gorodnova": "storage/contacts/employees/Gorodnova A.A.txt",
+        "konstantinova": "storage/contacts/employees/Konstantinova T.N.txt",
+        "kocherov": "storage/contacts/employees/Kocherov S.N.txt",
+        "marevichev": "storage/contacts/employees/Marevichev N.E.txt",
+        "peplin": "storage/contacts/employees/Peplin F.S.txt",
+        "poloneckaya": "storage/contacts/employees/Poloneсkaya N.A.txt",
+        "savina": "storage/contacts/employees/Savina O.N.txt",
+        "taleckiy": "storage/contacts/employees/Taleckiy D.S.txt",
+        "ulitin": "storage/contacts/employees/Ulitin B.I.txt",
+        "chistyakova": "storage/contacts/employees/Chistyakova S.A.txt"
+    }
+    teacher_file = teacher_files.get(callback.data)
+    if teacher_file:
+        teacher_info = read_text_file(teacher_file)
+        await callback.message.answer(teacher_info)
+    else:
+        await callback.message.answer("Информация о преподавателе не найдена")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_main")
+async def back_to_main_callback(callback: types.CallbackQuery):
+    await callback.message.answer("Главное меню:", reply_markup=get_main_keyboard())
+    await callback.answer()
+
+
 async def main():
     create_database()
     asyncio.create_task(send_daily_schedule())
