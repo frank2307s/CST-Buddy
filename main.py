@@ -161,7 +161,7 @@ def read_schedule_file(group_number, week_type, day_en):
             group_folder = "group 4"
         else:
             group_folder = "group 3"
-        file_path = os.path.join('storage/schedule/module 1', group_folder, week_type, f"{day_en}.txt")
+        file_path = os.path.join('storage/schedule/module 2', group_folder, week_type, f"{day_en}.txt")
         if not os.path.exists(file_path):
             return None
         with open(file_path, 'r', encoding='utf-8') as file:
