@@ -161,7 +161,7 @@ def read_schedule_file(group_number, week_type, day_en):
             group_folder = "group 4"
         else:
             group_folder = "group 3"
-        file_path = os.path.join('storage/schedule', group_folder, week_type, f"{day_en}.txt")
+        file_path = os.path.join('storage/schedule/module 1', group_folder, week_type, f"{day_en}.txt")
         if not os.path.exists(file_path):
             return None
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -173,7 +173,7 @@ def read_schedule_file(group_number, week_type, day_en):
 
 def get_current_week():
     week_number = datetime.now().isocalendar()[1]
-    return "lower" if week_number % 2 == 0 else "upper"
+    return "lower" if week_number % 2 == 1 else "upper"
 
 
 def is_valid_time(time_str):
@@ -447,11 +447,8 @@ async def send_schedule(callback, group_display, group_number, week_type, schedu
         week_display = "верхняя" if week_type == "upper" else "нижняя"
         if schedule_type == "today":
             day_of_week = datetime.now().weekday()
-            if day_of_week > 4:
-                await callback.message.answer("Сегодня выходной! Расписания нет.")
-                return
-            days_en = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-            days_ru = ['понедельник', 'вторник', 'среду', 'четверг', 'пятницу']
+            days_en = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+            days_ru = ['понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу', 'воскресенье']
             day_name = days_en[day_of_week]
             day_name_ru = days_ru[day_of_week]
             schedule_text = read_schedule_file(group_number, week_type, day_name)
@@ -459,7 +456,7 @@ async def send_schedule(callback, group_display, group_number, week_type, schedu
                 message = f"📅 Расписание на {day_name_ru}\n👥 {group_display}, {week_display} неделя\n\n{schedule_text}"
                 await callback.message.answer(message)
             else:
-                await callback.message.answer(f"На {day_name_ru} ({week_display} неделя) расписания нет.")
+                await callback.message.answer(f"На {day_name_ru} ({week_display} неделя) занятий нет.")
         else:
             week_schedule = f"📅 Расписание на неделю\n👥 {group_display}, {week_display} неделя\n\n"
             days = [
@@ -467,7 +464,9 @@ async def send_schedule(callback, group_display, group_number, week_type, schedu
                 ('tuesday', 'Вторник'),
                 ('wednesday', 'Среда'),
                 ('thursday', 'Четверг'),
-                ('friday', 'Пятница')
+                ('friday', 'Пятница'),
+                ('saturday', 'Суббота'),
+                ('sunday', 'Воскресенье')
             ]
             has_content = False
             for day_en, day_ru in days:
@@ -495,10 +494,8 @@ async def send_daily_schedule():
                     current_time = now.time()
                     if current_time.hour == mailing_time.hour and current_time.minute == mailing_time.minute:
                         day_of_week = datetime.now().weekday()
-                        if day_of_week > 4:
-                            continue
-                        days_en = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-                        days_ru = ['понедельник', 'вторник', 'среду', 'четверг', 'пятницу']
+                        days_en = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                        days_ru = ['понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу', 'воскресенье']
                         day_name = days_en[day_of_week]
                         day_name_ru = days_ru[day_of_week]
                         schedule_text = read_schedule_file(group_number, current_week, day_name)
@@ -506,6 +503,10 @@ async def send_daily_schedule():
                             week_display = "верхняя" if current_week == "upper" else "нижняя"
                             message = f"📅 Расписание на {day_name_ru}\n👥 {group_number}, {week_display} неделя\n\n{schedule_text}"
                             await bot.send_message(user_id, message)
+                        else:
+                            if day_of_week >= 5:
+                                week_display = "верхняя" if current_week == "upper" else "нижняя"
+                                await bot.send_message(user_id, f"📅 На {day_name_ru} ({week_display} неделя) занятий нет.")
                 except Exception:
                     continue
             await asyncio.sleep(60)
